@@ -1,0 +1,7 @@
+CHANGELOG v0.1.0 
+09/14/2017
+-Added support for multi-server commands
+-Added support for myr files
+-Added password prompt
+-Updated help and option menu
+-Added support for --target option
