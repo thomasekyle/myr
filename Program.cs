@@ -33,6 +33,8 @@ namespace Radiant
             Boolean password_flag = false;
             Boolean help = false;
 
+
+
             var options = new OptionSet {
                 { "s|server=", "IP/Hostname of the server you wish to connect to.", s => server = s },
                 { "t|target=", "Target machines to run a command or myr file on.", t => myr_target = t },
@@ -55,7 +57,16 @@ namespace Radiant
             try
             {
                 // parse the command line
-                extra = options.Parse(args);
+                if (args.Length > 0)
+                {
+                    extra = options.Parse(args);    
+                } else 
+                {
+					Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
+					Console.WriteLine("Try `myr --help' for more information.");
+                    System.Environment.Exit(0);
+                }
+
             }
             catch (OptionException e)
             {
@@ -263,7 +274,6 @@ namespace Radiant
         }
 
         static void myrHelp() {
-            Console.WriteLine("Error - Cannot use a command and input file at the same time.");
             Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
             Console.WriteLine("Usage: myr [options] server [commands] ");
             Console.WriteLine();
