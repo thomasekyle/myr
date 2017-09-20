@@ -1,4 +1,12 @@
-﻿using System;
+﻿// //////////////////////////////////////////
+// Myr: A small automation tool for configuring/command unix/linux boxes.
+// @author Kyle Thomas
+// @version 0.1.0
+//
+// ///////////////////////////////////
+
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
