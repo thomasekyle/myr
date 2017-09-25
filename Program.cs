@@ -15,7 +15,8 @@ using System.Threading.Tasks;
 using Renci.SshNet;
 using Mono.Options;
 
-namespace Radiant
+
+namespace myr
 {
     class Program
     {
@@ -30,6 +31,7 @@ namespace Radiant
             string myr_file = String.Empty;
             string myr_command = String.Empty;
             string myr_target = String.Empty;
+            string myr_scp = String.Empty;
             Boolean password_flag = false;
             Boolean help = false;
 
@@ -43,6 +45,7 @@ namespace Radiant
                 { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => key_location = i },
                 { "c|myr_command=", "The command you you want to run.", c => myr_command = c },
                 { "m|myr_file=", "The file you you want to run.", m => myr_file = m },
+                {"S|scp=","The file(s) you wish to scp.", S => myr_scp = S},
                 { "v", "increase debug message verbosity", v => {
                 if (v != null)
                     ++verbosity;
@@ -92,7 +95,6 @@ namespace Radiant
             {
                 password = myrPassword();
             }
-            
 
             //Cannot specify option target and server at the same time.
             if (server != String.Empty && myr_target != String.Empty)
@@ -115,8 +117,13 @@ namespace Radiant
                 user = Environment.UserName;
 			}
             Console.WriteLine(myr_target);
+            int commands = 0;
             //Check to make sure the user didn't specify a file and a command.
-            if (myr_command != String.Empty && myr_file != String.Empty) {
+            if (myr_command != String.Empty) commands++;
+            if (myr_file != String.Empty) commands++;
+            if (myr_scp != String.Empty) commands++;
+
+            if (commands > 1) {
                 myrHelp();
 				options.WriteOptionDescriptions(Console.Out);
 				System.Environment.Exit(0);
@@ -127,6 +134,10 @@ namespace Radiant
 			else if (myr_file != String.Empty) { //If a myr file is provided you can run a list of commands
                if (server != String.Empty) myrFileS(server, user, password, myr_file);
                 if (myr_target != String.Empty) myrFileT(myr_target, user, password, myr_file);
+            } else if (myr_scp != String.Empty)
+            {
+				if (server != String.Empty) myScp(server, user, password, myr_file);
+				if (myr_target != String.Empty) myScpT(myr_target, user, password, myr_file);    
             } else {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
             }
@@ -273,6 +284,8 @@ namespace Radiant
             return 0;
         }
 
+
+        //Display the help menu.
         static void myrHelp() {
             Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
             Console.WriteLine("Usage: myr [options] server [commands] ");
@@ -281,6 +294,7 @@ namespace Radiant
             Console.WriteLine("Options:");
         }
 
+        //Provides a secure way of entering a password at the command line.
         static string myrPassword()
         {
             Console.WriteLine("Please enter the password you wish to use for authentication:");
@@ -294,6 +308,43 @@ namespace Radiant
             }
             return password;
         }
+
+
+        private async void createJob(string server, string user, string password)
+        {
+            //create the job
+            //wait for the job to complete
+           string result = await RunJob(server, user, password);        
+        }
+
+		private async void createJob(string server, string user, string key, string passphrase)
+		{
+			//create the job
+			//wait for the job to complete
+			string result = await RunJob();
+		}
+
+        private async Task<string> RunJob(string server, string user, string password) 
+        {
+            //delay the task
+            //other jobs can be started while this job is running.
+            //return when it is finished
+            MyrJob j = new MyrJob(user, server, password);
+            await Task.Delay(1000);
+            return "Finshed.";
+        } 
+
+		private async Task<string> RunJob(string server, string user, string key, string passpharse)
+		{	
+			//delay the task
+			//other jobs can be started while this job is running.
+			//return when it is finished
+			MyrJob j = new MyrJob(user, server, password);
+			await Task.Delay(1000);
+			return "Finshed.";
+		} 
+
+
        
     } 
 }

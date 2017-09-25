@@ -16,6 +16,7 @@ namespace myr
         private string myr_connection = String.Empty;
         private string myr_key = String.Empty;
         private string myr_passphrase = String.Empty;
+        private string scp_files = String.Empty;
         private PrivateKeyAuthenticationMethod pkey;
 
         public MyrJob(string u, string s, string p)
@@ -24,6 +25,14 @@ namespace myr
             myr_server = s;
             myr_password = p;
         }
+
+		public MyrJob(string u, string s, string k, string p)
+		{
+			myr_user = u;
+			myr_server = s;
+			myr_key = k;
+			myr_passphrase = p;   
+		}
 
         public void setPassword(string p) 
         {
@@ -41,15 +50,15 @@ namespace myr
 
         public void setKey(string key_location)
         {
-            pkey = new PrivateKeyAuthenticationMethod("username", new PrivateKeyFile[]{
+            pkey = new PrivateKeyAuthenticationMethod(myr_user, new PrivateKeyFile[]{
                     new PrivateKeyFile(@key_location)
             });
         }
 
         public void setKey(string key_location, string passphrase)
         {
-            pkey = new PrivateKeyAuthenticationMethod("username", new PrivateKeyFile[]{
-                    new PrivateKeyFile(key_location, passphrase)
+            pkey = new PrivateKeyAuthenticationMethod(myr_user, new PrivateKeyFile[]{
+                    new PrivateKeyFile(@key_location, passphrase)
             });
         }
 
@@ -68,7 +77,6 @@ namespace myr
 						Console.Write(client.RunCommand(myr_command).Result);
 					}
 					client.Disconnect();
-
 				}
 			}
 			catch (Exception e)
