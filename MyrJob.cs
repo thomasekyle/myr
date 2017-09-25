@@ -19,6 +19,7 @@ namespace myr
         private string scp_files = String.Empty;
         private PrivateKeyAuthenticationMethod pkey;
 
+        //Constructor for passowrd authenticaton
         public MyrJob(string u, string s, string p)
         {
             myr_user = u;
@@ -26,6 +27,7 @@ namespace myr
             myr_password = p;
         }
 
+        //Constructor for key authentication.
 		public MyrJob(string u, string s, string k, string p)
 		{
 			myr_user = u;

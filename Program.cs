@@ -119,6 +119,7 @@ namespace myr
             Console.WriteLine(myr_target);
             int commands = 0;
             //Check to make sure the user didn't specify a file and a command.
+            //check to make sure scp wasn't also specified.
             if (myr_command != String.Empty) commands++;
             if (myr_file != String.Empty) commands++;
             if (myr_scp != String.Empty) commands++;
