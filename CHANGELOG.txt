@@ -1,4 +1,12 @@
 CHANGELOG v0.1.0 
+09/29/2017
+-added scp function
+
+09/28/2017
+-changed framework to mono 4.5
+-added ability to comment out servers
+-added ability to comment out commands on myr files
+
 09/14/2017
 -Added support for multi-server commands
 -Added support for myr files

@@ -10,73 +10,84 @@ namespace myr
 {
     public class MyrJob
     {
-        private string myr_user = String.Empty;
-        private string myr_password = String.Empty;
-        private string myr_server = String.Empty;
-        private string myr_connection = String.Empty;
-        private string myr_key = String.Empty;
-        private string myr_passphrase = String.Empty;
-        private string scp_files = String.Empty;
+        private string myrUser = string.Empty;
+        private string myrPassword = string.Empty;
+        private string myrServer = string.Empty;
+        private string myrConnection = string.Empty;
+        private string myrKey = string.Empty;
+        private string myrPassphrase = string.Empty;
+        private string scpFile = string.Empty;
         private PrivateKeyAuthenticationMethod pkey;
 
         //Constructor for passowrd authenticaton
         public MyrJob(string u, string s, string p)
         {
-            myr_user = u;
-            myr_server = s;
-            myr_password = p;
+            myrUser = u;
+            myrServer = s;
+            myrPassword = p;
         }
 
         //Constructor for key authentication.
 		public MyrJob(string u, string s, string k, string p)
 		{
-			myr_user = u;
-			myr_server = s;
-			myr_key = k;
-			myr_passphrase = p;   
+			myrUser = u;
+			myrServer = s;
+			myrKey = k;
+			myrPassphrase = p;   
+		}
+			
+		public string MyrUser
+		{
+			get {return myrUser;}
+			set {myrUser = value;}
 		}
 
-        public void setPassword(string p) 
-        {
-            myr_password = p;
-        }
+		public string MyPassword
+		{
+			get {return myrPassword;}
+			set {myrPassword = value;}
+		}
 
-        public void setUser(string u) {
-            myr_user = u;
-        }
+		public string MyrServer
+		{
+			get {return myrServer;}
+			set {myrServer = value;}
+		}
 
-        public void setSever(string s) 
+		public string ScpFile
+		{
+			get {return scpFile;}
+			set {scpFile = value;}
+		}
+			
+        public void SetKey(string key_location)
         {
-            myr_server = s;
-        }
-
-        public void setKey(string key_location)
-        {
-            pkey = new PrivateKeyAuthenticationMethod(myr_user, new PrivateKeyFile[]{
+            pkey = new PrivateKeyAuthenticationMethod(myrUser, new PrivateKeyFile[]{
                     new PrivateKeyFile(@key_location)
             });
         }
 
         public void setKey(string key_location, string passphrase)
         {
-            pkey = new PrivateKeyAuthenticationMethod(myr_user, new PrivateKeyFile[]{
+            pkey = new PrivateKeyAuthenticationMethod(myrUser, new PrivateKeyFile[]{
                     new PrivateKeyFile(@key_location, passphrase)
             });
         }
 
-        public void runCommand(string myr_command) 
+		/* This method carries out a command on a single server */
+        public void RunCommand(string myrCommand) 
         {
-            string output = String.Empty;
-			Console.WriteLine(myr_server);
+            string output = string.Empty;
+			Console.WriteLine(myrServer);
 			try
 			{
-                using (var client = new SshClient(myr_server, myr_user, myr_password))
+                using (var client = new SshClient(myrServer, myrUser, myrPassword))
 				{
 
 					client.Connect();
-					if (myr_command != String.Empty)
+					if (myrCommand != string.Empty)
 					{
-						Console.Write(client.RunCommand(myr_command).Result);
+						Console.Write(client.RunCommand(myrCommand).Result);
 					}
 					client.Disconnect();
 				}
@@ -88,15 +99,16 @@ namespace myr
 
         }
 
-		public void runFile(string myr_file)
+		/* This method carries out all of the commands in a myr file on a single server. */
+		public void RunFile(string myr_file)
 		{
 			
-					Console.WriteLine(myr_server);
+					Console.WriteLine(myrServer);
 					StreamReader file = new StreamReader(myr_file);
-					string line = String.Empty;
+					string line = string.Empty;
 					try
 					{
-						using (var client = new SshClient(myr_server, myr_user, myr_password))
+						using (var client = new SshClient(myrServer, myrUser, myrPassword))
 						{
 							client.Connect();
 							while (!file.EndOfStream)
@@ -115,6 +127,41 @@ namespace myr
 					{
 						Console.WriteLine(e.Message);
 					}
+		}
+
+		//Upload file(s) to target servers
+		static void RunScp(string server, string user, string password, string scp) {
+			StreamReader file = new StreamReader(target);
+			string line = String.Empty;
+			//!sr.EndOfStream
+			while (!file.EndOfStream)
+			{
+				line = file.ReadLine();
+				Console.WriteLine(line);
+				if (!string.IsNullOrEmpty(line) && !(line.StartsWith("#")))
+				{
+					try
+					{
+						using (var sftp = new SftpClient(startConnection(line, user, password))){
+							string uploadfn = scp;
+							Console.WriteLine("SCP to host: " + scp);
+							sftp.Connect();
+							sftp.ChangeDirectory("/tmp");
+							Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
+							using (var uplfileStream = System.IO.File.OpenRead(uploadfn)) {
+								sftp.UploadFile(uplfileStream, uploadfn, true);
+							}
+							sftp.Disconnect();
+						}
+					} catch (Exception e)
+					{
+						Console.WriteLine(e.Message);
+					}
+
+				}
+
+			}
+
 		}
     }
 }

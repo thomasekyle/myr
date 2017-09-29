@@ -23,7 +23,7 @@ namespace myr
 
         static void Main(string[] args)
         {
-            int verbosity = 0;
+            int verbosity = 0; //Not implemented yet.
             string server = String.Empty;
             string user = String.Empty;
             string password = String.Empty;
@@ -34,7 +34,6 @@ namespace myr
             string myr_scp = String.Empty;
             Boolean password_flag = false;
             Boolean help = false;
-
 
 
             var options = new OptionSet {
@@ -128,22 +127,85 @@ namespace myr
                 myrHelp();
 				options.WriteOptionDescriptions(Console.Out);
 				System.Environment.Exit(0);
-            } else if (myr_command != String.Empty) { //Run a myr command if a command is present
+            } 
+			else if (myr_command != String.Empty) { //Run a myr command if a command is present
                 if (server != String.Empty) myrCommandS(server, user, password, myr_command);
                 if (myr_target != String.Empty) myrCommandT(myr_target, user, password, myr_command);
             }
 			else if (myr_file != String.Empty) { //If a myr file is provided you can run a list of commands
                if (server != String.Empty) myrFileS(server, user, password, myr_file);
                 if (myr_target != String.Empty) myrFileT(myr_target, user, password, myr_file);
-            } else if (myr_scp != String.Empty)
-            {
-				if (server != String.Empty) myScp(server, user, password, myr_file);
-				if (myr_target != String.Empty) myScpT(myr_target, user, password, myr_file);    
-            } else {
+            } 
+			//else if (myr_scp != String.Empty) {
+			//	if (server != String.Empty) myrScp(server, user, password, myr_file);
+			//	if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_file);    
+			//} 
+			else if (myr_scp != String.Empty) {
+				
+				if (server != String.Empty) myrScp(server, user, password, myr_scp);
+				if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_scp);
+			}
+			else {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
             }
 
 			
+		}
+
+		static ConnectionInfo startConnection(string server, string user, string password) {
+			ConnectionInfo ConnNfo = new ConnectionInfo(server,22,user,
+				new AuthenticationMethod[]{
+
+					// Pasword based Authentication
+					new PasswordAuthenticationMethod(user, password)
+
+					// Key Based Authentication (using keys in OpenSSH Format)
+					//new PrivateKeyAuthenticationMethod("username",new PrivateKeyFile[]{ 
+					//	new PrivateKeyFile(@"..\openssh.key","passphrase")
+					//}),
+				}
+			);
+			return ConnNfo;
+		}
+
+
+		static void myrScp(string s, string u, string p, string f) {
+		
+		}
+
+		//Upload file(s) to target servers
+		static void myrScpT(string target, string user, string password, string scp) {
+			StreamReader file = new StreamReader(target);
+			string line = String.Empty;
+			//!sr.EndOfStream
+			while (!file.EndOfStream)
+			{
+				line = file.ReadLine();
+				Console.WriteLine(line);
+				if (!string.IsNullOrEmpty(line) && !(line.StartsWith("#")))
+				{
+					try
+					{
+						using (var sftp = new SftpClient(startConnection(line, user, password))){
+							string uploadfn = scp;
+							Console.WriteLine("SCP to host: " + scp);
+							sftp.Connect();
+							sftp.ChangeDirectory("/tmp");
+							Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
+							using (var uplfileStream = System.IO.File.OpenRead(uploadfn)) {
+								sftp.UploadFile(uplfileStream, uploadfn, true);
+							}
+							sftp.Disconnect();
+						}
+					} catch (Exception e)
+					{
+						Console.WriteLine(e.Message);
+					}
+
+				}
+
+			}
+				
 		}
 
         //Method for running commands on a server.
@@ -182,7 +244,7 @@ namespace myr
             {
                 line = file.ReadLine();
                 Console.WriteLine(line);
-                if (!string.IsNullOrEmpty(line))
+				if (!string.IsNullOrEmpty(line) && !(line.StartsWith("#")))
                 {
                     try
                     {
@@ -251,7 +313,7 @@ namespace myr
             while (!file_target.EndOfStream)
             {
                 server = file_target.ReadLine();
-                if (!string.IsNullOrEmpty(server))
+				if (!string.IsNullOrEmpty(server) && !(server.StartsWith("#")))
                 {
                     Console.WriteLine(server);
                     StreamReader file = new StreamReader(myr_file);
@@ -322,7 +384,7 @@ namespace myr
 		{
 			//create the job
 			//wait for the job to complete
-			string result = await RunJob();
+			string result = await RunJob(server, user, passphrase);
 		}
 
         private async Task<string> RunJob(string server, string user, string password) 
@@ -335,12 +397,12 @@ namespace myr
             return "Finshed.";
         } 
 
-		private async Task<string> RunJob(string server, string user, string key, string passpharse)
+		private async Task<string> RunJob(string server, string user, string key, string passphrase)
 		{	
 			//delay the task
 			//other jobs can be started while this job is running.
 			//return when it is finished
-			MyrJob j = new MyrJob(user, server, password);
+			MyrJob j = new MyrJob(user, server, passphrase);
 			await Task.Delay(1000);
 			return "Finshed.";
 		} 
