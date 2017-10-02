@@ -129,9 +129,26 @@ namespace myr
 					}
 		}
 
+		static ConnectionInfo startConnection(string server, string user, string password)
+		{
+			ConnectionInfo ConnNfo = new ConnectionInfo(server, 22, user,
+				new AuthenticationMethod[]{
+
+                    // Pasword based Authentication
+                    new PasswordAuthenticationMethod(user, password)
+
+                    // Key Based Authentication (using keys in OpenSSH Format)
+                    //new PrivateKeyAuthenticationMethod("username",new PrivateKeyFile[]{ 
+                    //  new PrivateKeyFile(@"..\openssh.key","passphrase")
+                    //}),
+                }
+			);
+			return ConnNfo;
+		}
+
 		//Upload file(s) to target servers
 		static void RunScp(string server, string user, string password, string scp) {
-			StreamReader file = new StreamReader(target);
+			StreamReader file = new StreamReader(server);
 			string line = String.Empty;
 			//!sr.EndOfStream
 			while (!file.EndOfStream)

@@ -27,6 +27,7 @@ namespace myr
             string server = String.Empty;
             string user = String.Empty;
             string password = String.Empty;
+            string dir = String.Empty;
             string key_location = String.Empty;
             string myr_file = String.Empty;
             string myr_command = String.Empty;
@@ -44,7 +45,8 @@ namespace myr
                 { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => key_location = i },
                 { "c|myr_command=", "The command you you want to run.", c => myr_command = c },
                 { "m|myr_file=", "The file you you want to run.", m => myr_file = m },
-                {"S|scp=","The file(s) you wish to scp.", S => myr_scp = S},
+                { "S|scp=","The file(s) you wish to scp. Requires the directory flag.", S => myr_scp = S},
+                { "d|dir=","The directory for the scp file upload", d => dir = d},
                 { "v", "increase debug message verbosity", v => {
                 if (v != null)
                     ++verbosity;
@@ -140,10 +142,10 @@ namespace myr
 			//	if (server != String.Empty) myrScp(server, user, password, myr_file);
 			//	if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_file);    
 			//} 
-			else if (myr_scp != String.Empty) {
+			else if (myr_scp != String.Empty && dir != String.Empty) {
 				
 				if (server != String.Empty) myrScp(server, user, password, myr_scp);
-				if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_scp);
+				if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_scp, dir);
 			}
 			else {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
@@ -174,7 +176,7 @@ namespace myr
 		}
 
 		//Upload file(s) to target servers
-		static void myrScpT(string target, string user, string password, string scp) {
+		static void myrScpT(string target, string user, string password, string scp, string dir) {
 			StreamReader file = new StreamReader(target);
 			string line = String.Empty;
 			//!sr.EndOfStream
@@ -190,7 +192,7 @@ namespace myr
 							string uploadfn = scp;
 							Console.WriteLine("SCP to host: " + scp);
 							sftp.Connect();
-							sftp.ChangeDirectory("/tmp");
+							sftp.ChangeDirectory(dir);
 							Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
 							using (var uplfileStream = System.IO.File.OpenRead(uploadfn)) {
 								sftp.UploadFile(uplfileStream, uploadfn, true);
