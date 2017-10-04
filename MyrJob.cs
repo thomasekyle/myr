@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+//using System.Threading.Tasks;
 using Renci.SshNet;
 
 namespace myr
@@ -147,7 +147,7 @@ namespace myr
 		}
 
 		//Upload file(s) to target servers
-		static void RunScp(string server, string user, string password, string scp) {
+		static void RunScp(string server, string user, string password, string scp, string dir) {
 			StreamReader file = new StreamReader(server);
 			string line = String.Empty;
 			//!sr.EndOfStream
@@ -163,7 +163,7 @@ namespace myr
 							string uploadfn = scp;
 							Console.WriteLine("SCP to host: " + scp);
 							sftp.Connect();
-							sftp.ChangeDirectory("/tmp");
+							sftp.ChangeDirectory(dir);
 							Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
 							using (var uplfileStream = System.IO.File.OpenRead(uploadfn)) {
 								sftp.UploadFile(uplfileStream, uploadfn, true);

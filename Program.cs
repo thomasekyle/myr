@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+//using System.Threading.Tasks;
 using Renci.SshNet;
 using Mono.Options;
 
@@ -33,6 +33,9 @@ namespace myr
             string myr_command = String.Empty;
             string myr_target = String.Empty;
             string myr_scp = String.Empty;
+            string myrPassphrase = String.Empty;
+            //PrivateKeyAuthenticationMethod pkey;
+            Boolean passphraseFlag = false;
             Boolean password_flag = false;
             Boolean help = false;
 
@@ -41,8 +44,9 @@ namespace myr
                 { "s|server=", "IP/Hostname of the server you wish to connect to.", s => server = s },
                 { "t|target=", "Target machines to run a command or myr file on.", t => myr_target = t },
                 { "u|user=", "The user you wish to connect as.", u => user = u },
-                { "p|password", "The password you wish to use. (You should be using SSH keys.)", p => password_flag = p != null },
+                { "p|password", "The password you wish to use. (You should be using SSH keys)", p => password_flag = p != null },
                 { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => key_location = i },
+                { "P|passphrase=", "The passphrase associated with the ssh key you wish to use.", P => passphraseFlag = P != null},
                 { "c|myr_command=", "The command you you want to run.", c => myr_command = c },
                 { "m|myr_file=", "The file you you want to run.", m => myr_file = m },
                 { "S|scp=","The file(s) you wish to scp. Requires the directory flag.", S => myr_scp = S},
@@ -106,15 +110,19 @@ namespace myr
 
 
             //If server is not provided we will also aceept the value of the first arguement as the server
-            if (server == String.Empty && myr_target == String.Empty  && args[0] != null) {
+            if (server == String.Empty && myr_target == String.Empty  && args[0] != null) 
+            {
                 server = args[0];
-            } else if (args[0] == null){
+            } 
+            else if (args[0] == null) 
+            {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
                 System.Environment.Exit(0);
             }
 
             //If the user has not specififed the user we will use their local user name
-			if (user == String.Empty) {
+			if (user == String.Empty) 
+            {
                 user = Environment.UserName;
 			}
             Console.WriteLine(myr_target);
@@ -125,27 +133,25 @@ namespace myr
             if (myr_file != String.Empty) commands++;
             if (myr_scp != String.Empty) commands++;
 
+
+
             if (commands > 1) {
                 myrHelp();
 				options.WriteOptionDescriptions(Console.Out);
 				System.Environment.Exit(0);
             } 
 			else if (myr_command != String.Empty) { //Run a myr command if a command is present
-                if (server != String.Empty) myrCommandS(server, user, password, myr_command);
+                if (server != String.Empty) myrCommandS(server, user, password, key_location, myrPassphrase, myr_command);
                 if (myr_target != String.Empty) myrCommandT(myr_target, user, password, myr_command);
             }
 			else if (myr_file != String.Empty) { //If a myr file is provided you can run a list of commands
                if (server != String.Empty) myrFileS(server, user, password, myr_file);
                 if (myr_target != String.Empty) myrFileT(myr_target, user, password, myr_file);
             } 
-			//else if (myr_scp != String.Empty) {
-			//	if (server != String.Empty) myrScp(server, user, password, myr_file);
-			//	if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_file);    
-			//} 
 			else if (myr_scp != String.Empty && dir != String.Empty) {
 				
-				if (server != String.Empty) myrScp(server, user, password, myr_scp);
-				if (myr_target != String.Empty) myrScpT(myr_target, user, password, myr_scp, dir);
+				if (server != String.Empty) MyrScp(server, user, password, myr_scp, dir);
+				if (myr_target != String.Empty) MyrScpT(myr_target, user, password, myr_scp, dir);
 			}
 			else {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
@@ -170,13 +176,82 @@ namespace myr
 			return ConnNfo;
 		}
 
+		static ConnectionInfo startConnection(string server, string user, string password, string key_location, string passphrase)
+		{
+            ConnectionInfo ConnNfo = null;
 
-		static void myrScp(string s, string u, string p, string f) {
-		
+			if (key_location != String.Empty)
+			{
+				if (passphrase == String.Empty)
+				{
+					passphrase = myrPassword();
+				}
+				ConnNfo = new ConnectionInfo(server, 22, user,
+				new AuthenticationMethod[]{
+
+                    // Pasword based Authentication
+                    //new PasswordAuthenticationMethod(user, password),
+
+                    // Key Based Authentication (using keys in OpenSSH Format)
+                    new PrivateKeyAuthenticationMethod(user,new PrivateKeyFile[]{
+					new PrivateKeyFile(key_location, passphrase)
+					}),
+				}
+			);
+				return ConnNfo;
+			}
+			else if (password != String.Empty)
+			{
+				ConnNfo = new ConnectionInfo(server, 22, user,
+				new AuthenticationMethod[]{
+
+                    // Pasword based Authentication
+                    new PasswordAuthenticationMethod(user, password),
+
+                    // Key Based Authentication (using keys in OpenSSH Format)
+                    new PrivateKeyAuthenticationMethod(user,new PrivateKeyFile[]{
+					new PrivateKeyFile(key_location, passphrase)
+					}),
+				}
+			);
+				return ConnNfo;
+			}
+
+            return ConnNfo;
+		}
+
+
+		static void MyrScp(string server, string user, string password, string scp, string dir) 
+        {
+			Console.WriteLine(server);
+			if (!string.IsNullOrEmpty(server) && !(server.StartsWith("#")))
+			{
+				try
+				{
+					using (var sftp = new SftpClient(startConnection(server, user, password)))
+					{
+						string uploadfn = scp;
+						Console.WriteLine("SCP to host: " + scp);
+						sftp.Connect();
+						sftp.ChangeDirectory(dir);
+						Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
+						using (var uplfileStream = System.IO.File.OpenRead(uploadfn))
+						{
+							sftp.UploadFile(uplfileStream, uploadfn, true);
+						}
+						sftp.Disconnect();
+					}
+				}
+				catch (Exception e)
+				{
+					Console.WriteLine(e.Message);
+				}
+
+			}
 		}
 
 		//Upload file(s) to target servers
-		static void myrScpT(string target, string user, string password, string scp, string dir) {
+		static void MyrScpT(string target, string user, string password, string scp, string dir) {
 			StreamReader file = new StreamReader(target);
 			string line = String.Empty;
 			//!sr.EndOfStream
@@ -211,12 +286,12 @@ namespace myr
 		}
 
         //Method for running commands on a server.
-        static int myrCommandS(string server, string user, string password, string myr_command)
+        static int myrCommandS(string server, string user, string password, string key_location, string passphrase, string myr_command)
         {
             Console.WriteLine(server);
             try
             {
-                using (var client = new SshClient(server, user, password))
+                using (var client = new SshClient(startConnection(server, user ,password, key_location, passphrase)))
                 {
 
                     client.Connect();
@@ -375,39 +450,39 @@ namespace myr
         }
 
 
-        private async void createJob(string server, string user, string password)
-        {
-            //create the job
-            //wait for the job to complete
-           string result = await RunJob(server, user, password);        
-        }
+  //      private async void createJob(string server, string user, string password)
+  //      {
+  //          //create the job
+  //          //wait for the job to complete
+  //         string result = await RunJob(server, user, password);        
+  //      }
 
-		private async void createJob(string server, string user, string key, string passphrase)
-		{
-			//create the job
-			//wait for the job to complete
-			string result = await RunJob(server, user, passphrase);
-		}
+		//private async void createJob(string server, string user, string key, string passphrase)
+		//{
+		//	//create the job
+		//	//wait for the job to complete
+		//	string result = await RunJob(server, user, passphrase);
+		//}
 
-        private async Task<string> RunJob(string server, string user, string password) 
-        {
-            //delay the task
-            //other jobs can be started while this job is running.
-            //return when it is finished
-            MyrJob j = new MyrJob(user, server, password);
-            await Task.Delay(1000);
-            return "Finshed.";
-        } 
+  //      private async Task<string> RunJob(string server, string user, string password) 
+  //      {
+  //          //delay the task
+  //          //other jobs can be started while this job is running.
+  //          //return when it is finished
+  //          MyrJob j = new MyrJob(user, server, password);
+  //          await Task.Delay(1000);
+  //          return "Finshed.";
+  //      } 
 
-		private async Task<string> RunJob(string server, string user, string key, string passphrase)
-		{	
-			//delay the task
-			//other jobs can be started while this job is running.
-			//return when it is finished
-			MyrJob j = new MyrJob(user, server, passphrase);
-			await Task.Delay(1000);
-			return "Finshed.";
-		} 
+		//private async Task<string> RunJob(string server, string user, string key, string passphrase)
+		//{	
+		//	//delay the task
+		//	//other jobs can be started while this job is running.
+		//	//return when it is finished
+		//	MyrJob j = new MyrJob(user, server, passphrase);
+		//	await Task.Delay(1000);
+		//	return "Finshed.";
+		//} 
 
 
        
