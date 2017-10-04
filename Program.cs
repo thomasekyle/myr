@@ -23,39 +23,39 @@ namespace myr
 
         static void Main(string[] args)
         {
-            int verbosity = 0; //Not implemented yet.
+            //int verbosity = 0; //Not implemented yet.
             string server = String.Empty;
             string user = String.Empty;
             string password = String.Empty;
             string dir = String.Empty;
-            string key_location = String.Empty;
-            string myr_file = String.Empty;
-            string myr_command = String.Empty;
-            string myr_target = String.Empty;
-            string myr_scp = String.Empty;
+            string keyLocation = String.Empty;
+            string myrFile = String.Empty;
+            string myrCommand = String.Empty;
+            string myrTarget = String.Empty;
+            string myrSCP = String.Empty;
             string myrPassphrase = String.Empty;
             List<string> myrTasks = new List<string>();
             //PrivateKeyAuthenticationMethod pkey;
             Boolean passphraseFlag = false;
-            Boolean password_flag = false;
+            Boolean passwordFlag = false;
             Boolean help = false;
 
 
             var options = new OptionSet {
                 { "s|server=", "IP/Hostname of the server you wish to connect to.", s => server = s },
-                { "t|target=", "Target machines to run a command or myr file on.", t => myr_target = t },
+                { "t|target=", "Target machines to run a command or command file on.", t => myrTarget = t },
                 { "u|user=", "The user you wish to connect as.", u => user = u },
-                { "p|password", "The password you wish to use. (You should be using SSH keys)", p => password_flag = p != null },
-                { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => key_location = i },
+                { "p|password", "The password you wish to use.", p => passwordFlag = p != null },
+                { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => keyLocation = i },
                 { "P|passphrase=", "The passphrase associated with the ssh key you wish to use.", P => passphraseFlag = P != null},
-                { "c|myr_command=", "The command you you want to run.", c => myr_command = c },
-                { "m|myr_file=", "The file you you want to run.", m => myr_file = m },
-                { "S|scp=","The file(s) you wish to scp. Requires the directory flag.", S => myr_scp = S},
-                { "d|dir=","The directory for the scp file upload", d => dir = d},
-                { "v", "increase debug message verbosity", v => {
-                if (v != null)
-                    ++verbosity;
-                 } },
+                { "c|command=", "The command you you want to run.", c => myrCommand = c },
+                { "C|commandfile=", "The file you you want to run.", m => myrFile = m },
+                { "S|scp=","The file(s) you wish to scp. Requires the directory flag.", S => myrSCP = S},
+                { "d|directory=","The directory for the scp file upload", d => dir = d},
+                //{ "v", "increase debug message verbosity", v => {
+                //if (v != null)
+                //    ++verbosity;
+                // } },
                 { "h|help", "show this message and exit", h => help = h != null },
             };
 
@@ -98,13 +98,13 @@ namespace myr
 
 
             //Prompt the user for a password if the -p option is specified.
-            if (password_flag)
+            if (passwordFlag)
             {
                 password = myrPassword();
             }
 
             //Cannot specify option target and server at the same time.
-            if (server != String.Empty && myr_target != String.Empty)
+            if (server != String.Empty && myrTarget != String.Empty)
             {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
                 System.Environment.Exit(0);
@@ -113,7 +113,7 @@ namespace myr
 
             //If server is not provided we will also aceept the value of the first arguement as the server.
             //also check to make sure uer didn't specify server and a target
-            if (server == String.Empty && myr_target == String.Empty  && args[0] != null) 
+            if (server == String.Empty && myrTarget == String.Empty  && args[0] != null) 
             {
                 server = args[0];
             } 
@@ -130,15 +130,15 @@ namespace myr
 			}
 
             //Check to make sure a server and target weren't both specified
-            if (myr_target != String.Empty && server != String.Empty)
+            if (myrTarget != String.Empty && server != String.Empty)
             {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
                 System.Environment.Exit(0);
             }
-            else if (myr_target != String.Empty)
+            else if (myrTarget != String.Empty)
             {
-                Console.WriteLine("Using target: " + myr_target);
-                myrTasks = ParseText(myr_target);
+                Console.WriteLine("Using target: " + myrTarget);
+                myrTasks = ParseText(myrTarget);
               
             }
             else if (server != String.Empty)
@@ -150,9 +150,9 @@ namespace myr
             //Check to make sure the user didn't specify a file and a command.
             //check to make sure scp wasn't also specified.
             int commands = 0;
-            if (myr_command != String.Empty) commands++;
-            if (myr_file != String.Empty) commands++;
-            if (myr_scp != String.Empty) commands++;
+            if (myrCommand != String.Empty) commands++;
+            if (myrFile != String.Empty) commands++;
+            if (myrSCP != String.Empty) commands++;
             if (commands > 1)
             {
                 myrHelp();
@@ -165,18 +165,18 @@ namespace myr
             foreach (string t in myrTasks)
             {
                 Console.WriteLine("Running Task on: " + t);
-                ConnectionInfo myrSession = startConnection(t, user, password, key_location, passphraseFlag);
-                if (myr_command != String.Empty)
+                ConnectionInfo myrSession = startConnection(t, user, password, keyLocation, passphraseFlag);
+                if (myrCommand != String.Empty)
                 {
-                    myrCommandS(myrSession, myr_command);
+                    myrCommandS(myrSession, myrCommand);
                 }
-                if (myr_file != String.Empty)
+                if (myrFile != String.Empty)
                 {
-                    myrFileS(myrSession, myr_file);
+                    myrFileS(myrSession, myrFile);
                 }
-                if (myr_scp != String.Empty && dir != String.Empty)
+                if (myrSCP != String.Empty && dir != String.Empty)
                 {
-                    MyrScp(myrSession, myr_scp, dir);
+                    MyrScp(myrSession, myrSCP, dir);
                 }
             }
 
