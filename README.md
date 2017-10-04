@@ -26,8 +26,14 @@ myr [options] [target] [commands]
 
 ##### Example
  *myr -u thomasekyle -p -s example.com -c uptime*
+
+
  *myr -u thomasekyle -i ~/Keys/privatekey -P -t serverlist -C commandfile*
+
+
  *myr -u uploaduser -p -t serverlist --scp myfile*
+
+
 
  *note is you use the -p or -P flags you will be prompted to enter the Passphrase/Password*
 
