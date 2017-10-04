@@ -39,7 +39,6 @@ myr [options] [target] [commands]
   - Windows - [Download](https://github.com/thomasekyle/myr/blob/release/myr_Win.zip?raw=true)
   - Linux - [Download](https://github.com/thomasekyle/myr/blob/release/myr_Linux.tar?raw=true)
   - macOS - [Download](https://github.com/thomasekyle/myr/blob/release/myr_macOS.tar?raw=true)
-  Coming Soon.
 
   #### Contact
   If you find any problems please open an issue. Otherwise you can contact me at thomasekyle@gmail.com
