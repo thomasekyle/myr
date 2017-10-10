@@ -56,10 +56,10 @@ namespace myr
                 //if (v != null)
                 //    ++verbosity;
                 // } },
-                { "h|help", "show this message and exit", h => help = h != null },
+                { "h|help", "Show this message and exit", h => help = h != null },
             };
 
-           
+
             //Parising options provided by Mono. Exception message is also provided if the options
             //are used incorrectly.
             List<string> extra;
@@ -68,12 +68,12 @@ namespace myr
                 // parse the command line
                 if (args.Length > 0)
                 {
-                    extra = options.Parse(args);    
+                    extra = options.Parse(args);
                 }
-                else 
+                else
                 {
-					Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
-					Console.WriteLine("Try `myr --help' for more information.");
+                    Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
+                    Console.WriteLine("Try `myr --help' for more information.");
                     System.Environment.Exit(0);
                 }
 
@@ -89,12 +89,12 @@ namespace myr
 
 
             //If the user uses the help flag
-			if (help)
-			{
+            if (help)
+            {
                 myrHelp();
-				options.WriteOptionDescriptions(Console.Out);
-				System.Environment.Exit(0);
-			}
+                options.WriteOptionDescriptions(Console.Out);
+                System.Environment.Exit(0);
+            }
 
 
             //Prompt the user for a password if the -p option is specified.
@@ -113,21 +113,21 @@ namespace myr
 
             //If server is not provided we will also aceept the value of the first arguement as the server.
             //also check to make sure uer didn't specify server and a target
-            if (server == String.Empty && myrTarget == String.Empty  && args[0] != null) 
+            if (server == String.Empty && myrTarget == String.Empty && args[0] != null)
             {
                 server = args[0];
-            } 
-            else if (args[0] == null) 
+            }
+            else if (args[0] == null)
             {
                 Console.WriteLine("The was an error in your command usage. Please use myr --help for usage");
                 System.Environment.Exit(0);
             }
 
             //If the user has not specififed the user we will use their local user name
-			if (user == String.Empty) 
+            if (user == String.Empty)
             {
                 user = Environment.UserName;
-			}
+            }
 
             //Check to make sure a server and target weren't both specified
             if (myrTarget != String.Empty && server != String.Empty)
@@ -139,7 +139,7 @@ namespace myr
             {
                 Console.WriteLine("Using target: " + myrTarget);
                 myrTasks = ParseText(myrTarget);
-              
+
             }
             else if (server != String.Empty)
             {
@@ -180,34 +180,34 @@ namespace myr
                 }
             }
 
-         }
+        }
 
         //Method for using an sftp client to moves files up to a server.
-		static void MyrScp(ConnectionInfo session, string scp, string dir) 
+        static void MyrScp(ConnectionInfo session, string scp, string dir)
         {
-				try
-				{
-					using (var sftp = new SftpClient(session))
-					{
-						string uploadfn = scp;
-						Console.WriteLine("SCP to host: " + scp);
-						sftp.Connect();
-						sftp.ChangeDirectory(dir);
-						Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
-						using (var uplfileStream = System.IO.File.OpenRead(uploadfn))
-						{
-							sftp.UploadFile(uplfileStream, uploadfn, true);
-						}
-						sftp.Disconnect();
-					}
-				}
-				catch (Exception e)
-				{
-					Console.WriteLine(e.Message);
-				}
+            try
+            {
+                using (var sftp = new SftpClient(session))
+                {
+                    string uploadfn = scp;
+                    Console.WriteLine("SCP to host: " + scp);
+                    sftp.Connect();
+                    sftp.ChangeDirectory(dir);
+                    Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
+                    using (var uplfileStream = System.IO.File.OpenRead(uploadfn))
+                    {
+                        sftp.UploadFile(uplfileStream, uploadfn, true);
+                    }
+                    sftp.Disconnect();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
 
-			
-		}
+
+        }
 
         //Method for running commands on a server.
         static int myrCommandS(ConnectionInfo session, string myr_command)
@@ -225,11 +225,12 @@ namespace myr
                     client.Disconnect();
 
                 }
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 Console.WriteLine(e.Message);
             }
-            
+
             return 0;
         }
 
@@ -261,12 +262,13 @@ namespace myr
             {
                 Console.WriteLine(e.Message);
             }
-           
+
             return 0;
         }
 
         //Display the help menu.
-        static void myrHelp() {
+        static void myrHelp()
+        {
             Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
             Console.WriteLine("Usage: myr [options] server [commands] ");
             Console.WriteLine();
@@ -289,7 +291,12 @@ namespace myr
             return password;
         }
 
-        //Return a list each line in a text file
+        static ForwardedPortRemote CreateTunnel(string host, string port, string host2, string port2)
+        {
+            ForwardedPortRemote tunnel = null;
+            return tunnel; 
+        }
+        //Return a list each line in a tet file
         static List<string> ParseText(string target)
         {
             List<string> output = new List<string>();
