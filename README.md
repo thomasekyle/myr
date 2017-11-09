@@ -46,8 +46,8 @@ myr [options] [target] [commands]
 
   #### Binaries
   - Windows - [Download](https://github.com/thomasekyle/myr/blob/release/myr_Win.zip?raw=true)
-  - Linux - [Download](https://github.com/thomasekyle/myr/blob/release/myr_Linux.tar?raw=true)
-  - macOS - [Download](https://github.com/thomasekyle/myr/blob/release/myr_macOS.tar?raw=true)
+  - Linux - [Download](https://github.com/thomasekyle/myr/blob/release/myr_Linux.tar.gz?raw=true)
+  - macOS - [Download](https://github.com/thomasekyle/myr/blob/release/myr_macOS.tar.gz?raw=true)
 
   ### Note
   Renci.SshNet.dll is required for all Windows versions, it will need to be in the same directory as the executable.
