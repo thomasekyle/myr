@@ -1,4 +1,11 @@
-CHANGELOG v0.1.0 
+CHANGELOG v1.2 
+11/08/2017
+-Updated version.
+-Added Multi-Thread processing
+-Added ability to specify number of threads
+-Added ability to log output to file
+-Console output will now indicate when a process starts and when it is finished(SCP and Command Files)
+
 10/04/2017
 -Updated program flow
 -Added support for openssh keys

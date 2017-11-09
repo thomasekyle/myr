@@ -1,5 +1,5 @@
 ﻿// //////////////////////////////////////////
-// Myr: A small automation tool for configuring/command unix/linux boxes.
+// myr: A small automation tool for configuring/command unix/linux boxes.
 // @author Kyle Thomas
 // @version 0.1.0
 //
@@ -9,21 +9,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-//using System.Threading.Tasks;
 using Renci.SshNet;
 using Mono.Options;
-
+using System.Threading.Tasks;
 
 namespace myr
 {
     class Program
     {
-
         static void Main(string[] args)
         {
-            //int verbosity = 0; //Not implemented yet.
             string server = String.Empty;
             string user = String.Empty;
             string password = String.Empty;
@@ -34,8 +29,10 @@ namespace myr
             string myrTarget = String.Empty;
             string myrSCP = String.Empty;
             string myrPassphrase = String.Empty;
+            string logDir = String.Empty;
+            Int32 threads = Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 1.0));
+            string thread_option = String.Empty;
             List<string> myrTasks = new List<string>();
-            //PrivateKeyAuthenticationMethod pkey;
             Boolean passphraseFlag = false;
             Boolean passwordFlag = false;
             Boolean help = false;
@@ -52,6 +49,8 @@ namespace myr
                 { "C|commandfile=", "The file you you want to run.", m => myrFile = m },
                 { "S|scp=","The file(s) you wish to scp. Requires the directory flag.", S => myrSCP = S},
                 { "d|directory=","The directory for the scp file upload", d => dir = d},
+                { "l|log=","Log out to text file. You may specify the directory after this arguement. If you don't the current directory will be used.", l => logDir = l},
+                { "T|threads=","Specify the amount of concurrency (threads) you wish to use in running commands.", T => thread_option = T},
                 //{ "v", "increase debug message verbosity", v => {
                 //if (v != null)
                 //    ++verbosity;
@@ -161,42 +160,56 @@ namespace myr
             }
 
             Console.WriteLine("Number of tasks to complete: " + myrTasks.Count);
-            //Complete all Tasks for server(s)
-            foreach (string t in myrTasks)
+            //Complete all Tasks for server(s). User task count to keep track of which have completed.
+            int taskCount = 0;
+
+            //If the user has specified thread amount set to that value.
+            if (thread_option != String.Empty) threads = Convert.ToInt32(thread_option);
+            ParallelOptions pOptions = new ParallelOptions
             {
-                Console.WriteLine("Running Task on: " + t);
+                MaxDegreeOfParallelism = threads
+            };
+            Parallel.ForEach(myrTasks, pOptions, t =>
+            {
+                taskCount++;
                 ConnectionInfo myrSession = startConnection(t, user, password, keyLocation, passphraseFlag);
                 if (myrCommand != String.Empty)
                 {
-                    myrCommandS(myrSession, myrCommand);
+                   myrCommandS(myrSession, myrCommand, t, taskCount, logDir);
                 }
                 if (myrFile != String.Empty)
                 {
-                    myrFileS(myrSession, myrFile);
+                    myrFileS(myrSession, myrFile, t, taskCount, logDir);
                 }
                 if (myrSCP != String.Empty && dir != String.Empty)
                 {
-                    MyrScp(myrSession, myrSCP, dir);
+                    MyrScp(myrSession, myrSCP, t, taskCount, dir);
                 }
-            }
+            });
+
+            //foreach (string t in myrTasks)
+            //{
+               
+           // }
 
         }
 
         //Method for using an sftp client to moves files up to a server.
-        static void MyrScp(ConnectionInfo session, string scp, string dir)
+        static void MyrScp(ConnectionInfo session, string scp, string host, int taskID, string dir)
         {
             try
             {
                 using (var sftp = new SftpClient(session))
                 {
                     string uploadfn = scp;
-                    Console.WriteLine("SCP to host: " + scp);
+                    Console.WriteLine("[Execution] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     sftp.Connect();
                     sftp.ChangeDirectory(dir);
-                    Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
+                    //Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
                     using (var uplfileStream = System.IO.File.OpenRead(uploadfn))
                     {
                         sftp.UploadFile(uplfileStream, uploadfn, true);
+                        Console.WriteLine(taskID + "[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host ");
                     }
                     sftp.Disconnect();
                 }
@@ -210,17 +223,25 @@ namespace myr
         }
 
         //Method for running commands on a server.
-        static int myrCommandS(ConnectionInfo session, string myr_command)
+        static int myrCommandS(ConnectionInfo session, string myr_command, string host, int taskID, string logDir)
         {
             try
             {
                 using (var client = new SshClient(session))
                 {
-
                     client.Connect();
                     if (myr_command != String.Empty)
                     {
-                        Console.Write(client.RunCommand(myr_command).Result);
+                        string result = client.RunCommand(myr_command).Result;
+                        if (logDir == String.Empty)
+                        {
+                            Console.WriteLine("[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host + "\n" + result);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                            WriteFile(result, host, logDir); 
+                        }
                     }
                     client.Disconnect();
 
@@ -235,26 +256,43 @@ namespace myr
         }
 
         //Method for running multiple commands on a server using a myr file.
-        static int myrFileS(ConnectionInfo session, string myr_file)
+        static int myrFileS(ConnectionInfo session, string myr_file, string host, int taskID, string logDir)
         {
 
             StreamReader file = new StreamReader(myr_file);
             string line = String.Empty;
+            string result = String.Empty;
+
             try
             {
                 using (var client = new SshClient(session))
                 {
                     client.Connect();
                     //!sr.EndOfStream
+                    Console.WriteLine("[Execution] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     while (!file.EndOfStream)
                     {
                         line = file.ReadLine();
                         if (!string.IsNullOrEmpty(line) && !(line.StartsWith("#")))
                         {
-                            Console.Write(client.RunCommand(line).Result);
+                            if (logDir == String.Empty)
+                            {
+                                Console.Write(client.RunCommand(line).Result);
+                            }
+                            else
+                            {
+                                result += client.RunCommand(line).Result;
+                            }
                         }
                     }
+                    if (result != string.Empty)
+                    {
+                        WriteFile(result, host, logDir);
+                        
+                    }
+                    Console.WriteLine("[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     client.Disconnect();
+                    
 
                 }
             }
@@ -291,11 +329,7 @@ namespace myr
             return password;
         }
 
-        static ForwardedPortRemote CreateTunnel(string host, string port, string host2, string port2)
-        {
-            ForwardedPortRemote tunnel = null;
-            return tunnel; 
-        }
+
         //Return a list each line in a tet file
         static List<string> ParseText(string target)
         {
@@ -353,6 +387,27 @@ namespace myr
         }
 
 
+        /// <summary>
+        /// Writes a log file to the specified directory. This is a helper method.
+        /// </summary>
+        /// <param name="result"> The value of the resulting command(s).</param>
+        /// <param name="host">The host the command was run on</param>
+        /// <param name="logDir">The directory that the user want to write the log file to</param>
+        static void WriteFile(string result, string host, string logDir)
+        {
+            StreamWriter sw;
+            if (Directory.Exists(logDir))
+            {
+                sw = new StreamWriter(logDir + @"\" + host + ".log");
+            }
+            else
+            {
+                sw = new StreamWriter(@".\" + host + ".log");
+            }
+            sw.WriteLine(result);
+            sw.Close();
+            
+        }
         //Experimental async jobs (Unfished)
         //      private async void createJob(string server, string user, string password)
         //      {
