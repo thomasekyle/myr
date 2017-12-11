@@ -175,7 +175,7 @@ namespace myr
                 ConnectionInfo myrSession = startConnection(t, user, password, keyLocation, passphraseFlag);
                 if (myrCommand != String.Empty)
                 {
-                   myrCommandS(myrSession, myrCommand, t, taskCount, logDir);
+                    myrCommandS(myrSession, myrCommand, t, taskCount, logDir);
                 }
                 if (myrFile != String.Empty)
                 {
@@ -189,10 +189,11 @@ namespace myr
 
             //foreach (string t in myrTasks)
             //{
-               
-           // }
+
+            // }
 
         }
+
 
         //Method for using an sftp client to moves files up to a server.
         static void MyrScp(ConnectionInfo session, string scp, string host, int taskID, string dir)
@@ -216,7 +217,7 @@ namespace myr
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine("[Failure] => " + e.Message + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             }
 
 
@@ -249,7 +250,7 @@ namespace myr
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine("[Failure] => " + e.Message + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             }
 
             return 0;
@@ -298,7 +299,7 @@ namespace myr
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine("[Failure] => " + e.Message + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             }
 
             return 0;
