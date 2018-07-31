@@ -12,6 +12,7 @@ using System.IO;
 using Renci.SshNet;
 using Mono.Options;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace myr
 {
@@ -19,6 +20,7 @@ namespace myr
     {
         static void Main(string[] args)
         {
+
             string server = String.Empty;
             string user = String.Empty;
             string password = String.Empty;
@@ -33,21 +35,27 @@ namespace myr
             Int32 threads = Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 1.0));
             string thread_option = String.Empty;
             List<string> myrTasks = new List<string>();
+            Boolean becomeRoot = false;
             Boolean passphraseFlag = false;
             Boolean passwordFlag = false;
+            Boolean ttyFlag = false;
             Boolean help = false;
+            Boolean pbflag = false;
 
 
             var options = new OptionSet {
                 { "s|server=", "IP/Hostname of the server you wish to connect to.", s => server = s },
-                { "t|target=", "Target machines to run a command or command file on.", t => myrTarget = t },
-                { "u|user=", "The user you wish to connect as.", u => user = u },
-                { "p|password", "The password you wish to use.", p => passwordFlag = p != null },
+                { "S|Servers=", "Target machines to run a command or command file on.", S => myrTarget = S },
+                { "u|user=", "The user you wish to connect as.", l => user = l },
+                { "pw|password", "The password you wish to use.", p => passwordFlag = p != null },
+                { "t|tty", "Use tty session like PuTTY and other ssh clients.", t => ttyFlag = t != null },
+                { "B|become-root", "Become root to run elevated commands.", B => becomeRoot = B != null },
+                { "pb|pbrun", "Use pbrun su - to run elevated commands.", pb => pbflag = pb != null },
                 { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => keyLocation = i },
                 { "P|passphrase=", "The passphrase associated with the ssh key you wish to use.", P => passphraseFlag = P != null},
                 { "c|command=", "The command you you want to run.", c => myrCommand = c },
-                { "C|commandfile=", "The file you you want to run.", m => myrFile = m },
-                { "S|scp=","The file(s) you wish to scp. Requires the directory flag.", S => myrSCP = S},
+                { "C|commandfile=", "The file you you want to run.", C => myrFile = C },
+                { "U|scp=","The file(s) you wish to scp. Requires the directory flag.", U => myrSCP = U},
                 { "d|directory=","The directory for the scp file upload", d => dir = d},
                 { "l|log=","Log out to text file. You may specify the directory after this arguement. If you don't the current directory will be used.", l => logDir = l},
                 { "T|threads=","Specify the amount of concurrency (threads) you wish to use in running commands.", T => thread_option = T},
@@ -175,7 +183,7 @@ namespace myr
                 ConnectionInfo myrSession = startConnection(t, user, password, keyLocation, passphraseFlag);
                 if (myrCommand != String.Empty)
                 {
-                    myrCommandS(myrSession, myrCommand, t, taskCount, logDir);
+                    myrCommandS(myrSession, myrCommand, t, taskCount, logDir, ttyFlag, password, pbflag);
                 }
                 if (myrFile != String.Empty)
                 {
@@ -206,34 +214,80 @@ namespace myr
                     Console.WriteLine("[Execution] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     sftp.Connect();
                     sftp.ChangeDirectory(dir);
+                    string basefile = Path.GetFileName(scp);
                     //Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
                     using (var uplfileStream = System.IO.File.OpenRead(uploadfn))
                     {
-                        sftp.UploadFile(uplfileStream, uploadfn, true);
-                        Console.WriteLine(taskID + "[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host ");
+                        sftp.UploadFile(uplfileStream, basefile, true);
+                        Console.WriteLine(taskID + "[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     }
                     sftp.Disconnect();
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("[Failure] => " + e.Message + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                Console.WriteLine("[Failure] => " + e.Message + " " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             }
 
 
         }
 
         //Method for running commands on a server.
-        static int myrCommandS(ConnectionInfo session, string myr_command, string host, int taskID, string logDir)
+        static int myrCommandS(ConnectionInfo session, string myr_command, string host, int taskID, string logDir, Boolean ttyFlag, string password, Boolean pbflag)
         {
             try
             {
                 using (var client = new SshClient(session))
                 {
                     client.Connect();
+                    string result = String.Empty;
+
                     if (myr_command != String.Empty)
                     {
-                        string result = client.RunCommand(myr_command).Result;
+                        if (ttyFlag == true)
+                        {
+                            
+                            IDictionary<Renci.SshNet.Common.TerminalModes, uint> termkvp = new Dictionary<Renci.SshNet.Common.TerminalModes, uint>();
+                            termkvp.Add(Renci.SshNet.Common.TerminalModes.ECHO, 53);
+
+                            ShellStream shellStream = client.CreateShellStream("vt320", 0, 0, 0, 0, 1024, termkvp);
+                            String output = shellStream.Expect(new Regex(@"[$>]"));
+                            Console.WriteLine(output);
+                            if (pbflag == true)
+                            {
+                                shellStream.WriteLine("pbrun su -");
+                                System.Threading.Thread.Sleep(10000);
+                                output = shellStream.Expect(new Regex(@"([$#>:])"));
+                                if (!(output.Contains("Error")))
+                                {
+                                    shellStream.WriteLine(password);
+                                } else
+                                {
+                                    throw new System.InvalidOperationException("Could not elevate with pbrun. Error occured. Please retry.");
+                                }
+                                Console.WriteLine(shellStream.Read());
+                                System.Threading.Thread.Sleep(7000);
+                                output = shellStream.Expect(new Regex(@"[$#>]"));
+                                Console.WriteLine(output);
+                                shellStream.WriteLine(myr_command);
+                                output = shellStream.Expect(new Regex(@"[$#>]"));
+                                Console.WriteLine(output);
+                                shellStream.WriteLine("echo myrfinish");
+                            } else
+                            {
+                                shellStream.WriteLine(myr_command);
+                                output = shellStream.Expect(new Regex(@"[$#>]"));
+                                Console.WriteLine(output);
+                                shellStream.WriteLine("echo myrfinish");
+                            }
+                            
+                            
+
+                        } else
+                        {
+                            result = client.RunCommand(myr_command).Result;
+                        }
+                        
                         if (logDir == String.Empty)
                         {
                             Console.WriteLine("[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host + "\n" + result);
@@ -250,7 +304,7 @@ namespace myr
             }
             catch (Exception e)
             {
-                Console.WriteLine("[Failure] => " + e.Message + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                Console.WriteLine("[Failure] => " + e.Message + " " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             }
 
             return 0;
@@ -299,7 +353,7 @@ namespace myr
             }
             catch (Exception e)
             {
-                Console.WriteLine("[Failure] => " + e.Message + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                Console.WriteLine("[Failure] => " + e.Message + " " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             }
 
             return 0;
@@ -350,6 +404,8 @@ namespace myr
 
             return output;
         }
+
+     
 
         //Creats and returns connection object base on parameters provided.
         static ConnectionInfo startConnection(string server, string user, string password, string key_location, Boolean passphrase)
