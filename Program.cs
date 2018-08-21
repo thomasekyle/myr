@@ -32,15 +32,16 @@ namespace myr
             string myrSCP = String.Empty;
             string myrPassphrase = String.Empty;
             string logDir = String.Empty;
+            string pbArgs = String.Empty;
             Int32 threads = Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 1.0));
             string thread_option = String.Empty;
             List<string> myrTasks = new List<string>();
             Boolean becomeRoot = false;
+            Boolean elevateRoot = false;
             Boolean passphraseFlag = false;
             Boolean passwordFlag = false;
             Boolean ttyFlag = false;
             Boolean help = false;
-            Boolean pbflag = false;
 
 
             var options = new OptionSet {
@@ -48,15 +49,16 @@ namespace myr
                 { "S|Servers=", "Target machines to run a command or command file on.", S => myrTarget = S },
                 { "u|user=", "The user you wish to connect as.", l => user = l },
                 { "pw|password", "The password you wish to use.", p => passwordFlag = p != null },
-                { "t|tty", "Use tty session like PuTTY and other ssh clients.", t => ttyFlag = t != null },
-                { "B|become-root", "Become root to run elevated commands.", B => becomeRoot = B != null },
-                { "pb|pbrun", "Use pbrun su - to run elevated commands.", pb => pbflag = pb != null },
+                { "t|tty", "Use TTY session on logon.", t => ttyFlag = t != null },
+                { "b|become-root", "Become(su) root to run elevated commands. (TTY only)", b => becomeRoot = b != null },
+                { "e|elevate-root", "Become(su) root to run elevated commands. (TTY only)", e => elevateRoot = e != null },
+                { "pb|pbrun=", "Use pbrun to run elevated commands.", pb => pbArgs = pb },
                 { "i|identity-file=", "The location of the identity file you wish to use (SSH Key)", i => keyLocation = i },
                 { "P|passphrase=", "The passphrase associated with the ssh key you wish to use.", P => passphraseFlag = P != null},
                 { "c|command=", "The command you you want to run.", c => myrCommand = c },
                 { "C|commandfile=", "The file you you want to run.", C => myrFile = C },
                 { "U|scp=","The file(s) you wish to scp. Requires the directory flag.", U => myrSCP = U},
-                { "d|directory=","The directory for the scp file upload", d => dir = d},
+                { "d|directory=","The directory for the scp file upload.", d => dir = d},
                 { "l|log=","Log out to text file. You may specify the directory after this arguement. If you don't the current directory will be used.", l => logDir = l},
                 { "T|threads=","Specify the amount of concurrency (threads) you wish to use in running commands.", T => thread_option = T},
                 //{ "v", "increase debug message verbosity", v => {
@@ -107,7 +109,7 @@ namespace myr
             //Prompt the user for a password if the -p option is specified.
             if (passwordFlag)
             {
-                password = myrPassword();
+                password = Password();
             }
 
             //Cannot specify option target and server at the same time.
@@ -167,11 +169,15 @@ namespace myr
                 System.Environment.Exit(0);
             }
 
+
             Console.WriteLine("Number of tasks to complete: " + myrTasks.Count);
+            
             //Complete all Tasks for server(s). User task count to keep track of which have completed.
             int taskCount = 0;
 
-            //If the user has specified thread amount set to that value.
+            // If the user has specified thread amount set to that value.
+            // The program will default to about a little over half of the available threads on the 
+            // machine it is being run on.
             if (thread_option != String.Empty) threads = Convert.ToInt32(thread_option);
             ParallelOptions pOptions = new ParallelOptions
             {
@@ -180,30 +186,30 @@ namespace myr
             Parallel.ForEach(myrTasks, pOptions, t =>
             {
                 taskCount++;
-                ConnectionInfo myrSession = startConnection(t, user, password, keyLocation, passphraseFlag);
+                ConnectionInfo myrSession = StartConnection(t, user, password, keyLocation, passphraseFlag);
                 if (myrCommand != String.Empty)
                 {
-                    myrCommandS(myrSession, myrCommand, t, taskCount, logDir, ttyFlag, password, pbflag);
+                    myrCommandS(myrSession, myrCommand, t, taskCount, logDir, ttyFlag, password, pbArgs);
                 }
                 if (myrFile != String.Empty)
                 {
-                    myrFileS(myrSession, myrFile, t, taskCount, logDir);
+                    MyrCommandFile(myrSession, myrFile, t, taskCount, logDir);
                 }
                 if (myrSCP != String.Empty && dir != String.Empty)
                 {
                     MyrScp(myrSession, myrSCP, t, taskCount, dir);
                 }
             });
-
-            //foreach (string t in myrTasks)
-            //{
-
-            // }
-
         }
 
-
-        //Method for using an sftp client to moves files up to a server.
+         /// <summary>
+         /// This function establishes and scp session to upload a file to the target directory specified,
+         /// </summary>
+         /// <param name="session">The connection session (SCP Session)</param>
+         /// <param name="scp">The file that is going to uploaded to the host</param>
+         /// <param name="host">the target host that the file will be uploaded to.</param>
+         /// <param name="taskID">The ID of the task if there are multiple hosts to upload the file to</param>
+         /// <param name="dir">The directory on the host to upload the file to.</param>
         static void MyrScp(ConnectionInfo session, string scp, string host, int taskID, string dir)
         {
             try
@@ -215,11 +221,10 @@ namespace myr
                     sftp.Connect();
                     sftp.ChangeDirectory(dir);
                     string basefile = Path.GetFileName(scp);
-                    //Console.WriteLine("Sftp Client is connected: " + sftp.IsConnected);
                     using (var uplfileStream = System.IO.File.OpenRead(uploadfn))
                     {
                         sftp.UploadFile(uplfileStream, basefile, true);
-                        Console.WriteLine(taskID + "[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                        Console.WriteLine("[Success] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     }
                     sftp.Disconnect();
                 }
@@ -232,8 +237,22 @@ namespace myr
 
         }
 
-        //Method for running commands on a server.
-        static int myrCommandS(ConnectionInfo session, string myr_command, string host, int taskID, string logDir, Boolean ttyFlag, string password, Boolean pbflag)
+        /// <summary>
+        /// This function will run a single command on a host specified by the program.
+        /// </summary>
+        /// <param name="session">The session used to connect to each host</param>
+        /// <param name="myr_command">The command to run on the target host(s)</param>
+        /// <param name="host">the host to run the command on.</param>
+        /// <param name="taskID">The ID assigned to the specific host to a task</param>
+        /// <param name="logDir">The directory that log files will be written to the log option is necessary</param>
+        /// <param name="ttyFlag">This flag will allow to use tty session for ssh</param>
+        /// <param name="password">The password for elevation. If not specified it will default to the auth password</param>
+        /// <param name="pbArgs">Agruements for the pbrun flag. This can be used to run a command if just -c is specified.</param>
+        /// <returns>        
+        /// If the User provides a logPath this will create the log file(s) in that directory.
+        /// otherwise this function will return output to the console.
+        /// </returns>
+        static int myrCommandS(ConnectionInfo session, string myr_command, string host, int taskID, string logDir, Boolean ttyFlag, string password, string pbArgs)
         {
             try
             {
@@ -253,12 +272,14 @@ namespace myr
                             ShellStream shellStream = client.CreateShellStream("vt320", 0, 0, 0, 0, 1024, termkvp);
                             String output = shellStream.Expect(new Regex(@"[$>]"));
                             Console.WriteLine(output);
-                            if (pbflag == true)
+
+                            // Stuff for PBuL elevation
+                            if (pbArgs != string.Empty)
                             {
-                                shellStream.WriteLine("pbrun su -");
+                                shellStream.WriteLine("pbrun " + pbArgs);
                                 System.Threading.Thread.Sleep(10000);
                                 output = shellStream.Expect(new Regex(@"([$#>:])"));
-                                if (!(output.Contains("Error")))
+                                if (output.ToLower().Contains("password") && !(output.ToLower().Contains("error")))
                                 {
                                     shellStream.WriteLine(password);
                                 } else
@@ -271,6 +292,7 @@ namespace myr
                                 Console.WriteLine(output);
                                 shellStream.WriteLine(myr_command);
                                 output = shellStream.Expect(new Regex(@"[$#>]"));
+                                result = output;
                                 Console.WriteLine(output);
                                 shellStream.WriteLine("echo myrfinish");
                             } else
@@ -281,8 +303,6 @@ namespace myr
                                 shellStream.WriteLine("echo myrfinish");
                             }
                             
-                            
-
                         } else
                         {
                             result = client.RunCommand(myr_command).Result;
@@ -310,11 +330,22 @@ namespace myr
             return 0;
         }
 
-        //Method for running multiple commands on a server using a myr file.
-        static int myrFileS(ConnectionInfo session, string myr_file, string host, int taskID, string logDir)
+        /// <summary>
+        /// This function will run commands in a file on a target host.
+        /// </summary>
+        /// <param name="session">The connection session (SSH Session)</param>
+        /// <param name="File">The file you wish to run commands from</param>
+        /// <param name="host">The host that the commands will be run on</param>
+        /// <param name="taskID">The ID of the host that commands are running if there are multiple</param>
+        /// <param name="logDir">The directory that log files will be place it from the run</param>
+        /// <returns>
+        /// If the User provides a logPath this will create the log file(s) in that directory.
+        /// otherwise this function will return output to the console.
+        /// </returns>
+        static int MyrCommandFile(ConnectionInfo session, string File, string host, int taskID, string logDir)
         {
 
-            StreamReader file = new StreamReader(myr_file);
+            StreamReader file = new StreamReader(File);
             string line = String.Empty;
             string result = String.Empty;
 
@@ -323,7 +354,6 @@ namespace myr
                 using (var client = new SshClient(session))
                 {
                     client.Connect();
-                    //!sr.EndOfStream
                     Console.WriteLine("[Execution] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     while (!file.EndOfStream)
                     {
@@ -359,7 +389,9 @@ namespace myr
             return 0;
         }
 
-        //Display the help menu.
+        /// <summary>
+        /// This will display the help menu and all the avaible command that you can use with Myr
+        /// </summary>
         static void myrHelp()
         {
             Console.WriteLine("Myr: A small tool for mass unix/linux configuration.");
@@ -369,8 +401,14 @@ namespace myr
             Console.WriteLine("Options:");
         }
 
-        //Provides a secure way of entering a password at the command line.
-        static string myrPassword()
+        /// <summary>
+        /// This function provides a secure way of entering your password in, so it
+        /// will not appear on the terminal.
+        /// </summary>
+        /// <returns>
+        /// Return the password entered as a string.
+        /// </returns>
+        static string Password()
         {
             Console.WriteLine("Please enter the password you wish to use for authentication:");
             string password = null;
@@ -384,14 +422,19 @@ namespace myr
             return password;
         }
 
-
-        //Return a list each line in a tet file
+        /// <summary>
+        /// This will return a list of strings that can be placed inside of a function
+        /// to run through a parallel For Each loop.
+        /// </summary>
+        /// <param name="target">The file you wish to parse and create the list from</param>
+        /// <returns>
+        /// Return a List that can be fed into a parallel ForEach
+        /// </returns>
         static List<string> ParseText(string target)
         {
             List<string> output = new List<string>();
             StreamReader file_target = new StreamReader(target);
             string server = String.Empty;
-            //!sr.EndOfStream
             while (!file_target.EndOfStream)
             {
                 server = file_target.ReadLine();
@@ -407,8 +450,18 @@ namespace myr
 
      
 
-        //Creats and returns connection object base on parameters provided.
-        static ConnectionInfo startConnection(string server, string user, string password, string key_location, Boolean passphrase)
+        /// <summary>
+        /// This function will atempt to create a session (SSH/SCP) with the provided credentials.
+        /// </summary>
+        /// <param name="server">The host to create the session for</param>
+        /// <param name="user">The user account to use when authenticating</param>
+        /// <param name="password">The password to provide when creating the session</param>
+        /// <param name="key_location">The location to the private key to use when creating the session</param>
+        /// <param name="passphrase">The passphrase to use with the private key when creating the session</param>
+        /// <returns>
+        /// Will return the session info to start the connection.
+        /// </returns>
+        static ConnectionInfo StartConnection(string server, string user, string password, string key_location, Boolean passphrase)
         {
             ConnectionInfo ConnNfo = null;
 
@@ -417,7 +470,7 @@ namespace myr
                 string tempPassphrase = String.Empty;
                 if (passphrase)
                 {
-                    tempPassphrase = myrPassword();
+                    tempPassphrase = Password();
                 }
                 ConnNfo = new ConnectionInfo(server, 22, user,
                 new AuthenticationMethod[]{
@@ -465,41 +518,6 @@ namespace myr
             sw.Close();
             
         }
-        //Experimental async jobs (Unfished)
-        //      private async void createJob(string server, string user, string password)
-        //      {
-        //          //create the job
-        //          //wait for the job to complete
-        //         string result = await RunJob(server, user, password);        
-        //      }
-
-        //private async void createJob(string server, string user, string key, string passphrase)
-        //{
-        //	//create the job
-        //	//wait for the job to complete
-        //	string result = await RunJob(server, user, passphrase);
-        //}
-
-        //      private async Task<string> RunJob(string server, string user, string password) 
-        //      {
-        //          //delay the task
-        //          //other jobs can be started while this job is running.
-        //          //return when it is finished
-        //          MyrJob j = new MyrJob(user, server, password);
-        //          await Task.Delay(1000);
-        //          return "Finshed.";
-        //      } 
-
-        //private async Task<string> RunJob(string server, string user, string key, string passphrase)
-        //{	
-        //	//delay the task
-        //	//other jobs can be started while this job is running.
-        //	//return when it is finished
-        //	MyrJob j = new MyrJob(user, server, passphrase);
-        //	await Task.Delay(1000);
-        //	return "Finshed.";
-        //} 
-
 
 
     } 
