@@ -183,6 +183,36 @@ namespace myr
             {
                 MaxDegreeOfParallelism = threads
             };
+
+            // We need to parse all of the commands that are comming into the program
+            // and ensure we capture them all in the order they excute in. (Much like ansible
+            // this will make sure that each host will execute the commands and if any fail out we
+            // will just fail the run for that host. We will have to maintain the sessions for every
+            // host outside within the loop
+
+            // Parse Commands
+            // return array
+
+            // Foreach command
+            // Establish Session --
+            // ---------------------------
+            // host1 SUCCESS
+            //      output if necessary (will add an option for output supression)
+            // host2 SUCCESS
+            //      output if necessary (will add an option for output supression)
+            // host3 SUCCESS
+            //      output if necessary (will add an option for output supression)      
+            //            
+            // Command1 -- ls /tmp
+            // ---------------------------
+            // host1 SUCCESS
+            //      output if necessary (will add an option for output supression)
+            // host2 SUCCESS
+            //      output if necessary (will add an option for output supression)
+            // host3 FAILURE
+            //      host3 will not continue running more commands
+            //
+
             Parallel.ForEach(myrTasks, pOptions, t =>
             {
                 taskCount++;
@@ -217,7 +247,7 @@ namespace myr
                 using (var sftp = new SftpClient(session))
                 {
                     string uploadfn = scp;
-                    Console.WriteLine("[Execution] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                    Console.WriteLine("[Upload File] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
                     sftp.Connect();
                     sftp.ChangeDirectory(dir);
                     string basefile = Path.GetFileName(scp);
@@ -254,6 +284,7 @@ namespace myr
         /// </returns>
         static int myrCommandS(ConnectionInfo session, string myr_command, string host, int taskID, string logDir, Boolean ttyFlag, string password, string pbArgs)
         {
+            Console.WriteLine("[Run Command] => " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
             try
             {
                 using (var client = new SshClient(session))
@@ -265,13 +296,15 @@ namespace myr
                     {
                         if (ttyFlag == true)
                         {
+                            
                             client.RunCommand("echo myrfinish > /tmp/myrtmp"); //Create an exitpoint for myr
                             IDictionary<Renci.SshNet.Common.TerminalModes, uint> termkvp = new Dictionary<Renci.SshNet.Common.TerminalModes, uint>();
                             termkvp.Add(Renci.SshNet.Common.TerminalModes.ECHO, 53);
 
                             ShellStream shellStream = client.CreateShellStream("vt320", 0, 0, 0, 0, 1024, termkvp);
                             String output = shellStream.Expect(new Regex(@"[$>]"));
-                            //Console.WriteLine(output);
+                            String output2 = string.Empty;
+                            // Console.WriteLine(output);
 
                             // Stuff for PBuL elevation
                             if (pbArgs != string.Empty)
@@ -291,8 +324,10 @@ namespace myr
                                 output = shellStream.Expect(new Regex(@"[$#>]"));
                                 shellStream.WriteLine(myr_command + " && cat /tmp/myrtmp");
                                 output = shellStream.Expect(new Regex(@"(myrfinish)")); //return output on the exit point
-                                result = output;
-                                Console.WriteLine(output);
+                                output2 = output.Replace("myrfinish", "").Replace(myr_command,"").Replace("&& cat /tmp/myrtmp", "");
+                                
+                                result = output2;
+                                Console.WriteLine(output2);
                             } else
                             {
                                 shellStream.WriteLine(myr_command);
@@ -322,7 +357,8 @@ namespace myr
             }
             catch (Exception e)
             {
-                Console.WriteLine("[Failure] => " + e.Message + " " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host);
+                Console.WriteLine("[Failure] => " + e.Message + " " + DateTime.Now.ToString("h:mm:ss tt") + " on host " + host)
+                return 1;
             }
 
             return 0;
