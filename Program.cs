@@ -265,13 +265,13 @@ namespace myr
                     {
                         if (ttyFlag == true)
                         {
-                            
+                            client.RunCommand("echo myrfinish > /tmp/myrtmp"); //Create an exitpoint for myr
                             IDictionary<Renci.SshNet.Common.TerminalModes, uint> termkvp = new Dictionary<Renci.SshNet.Common.TerminalModes, uint>();
                             termkvp.Add(Renci.SshNet.Common.TerminalModes.ECHO, 53);
 
                             ShellStream shellStream = client.CreateShellStream("vt320", 0, 0, 0, 0, 1024, termkvp);
                             String output = shellStream.Expect(new Regex(@"[$>]"));
-                            Console.WriteLine(output);
+                            //Console.WriteLine(output);
 
                             // Stuff for PBuL elevation
                             if (pbArgs != string.Empty)
@@ -286,21 +286,19 @@ namespace myr
                                 {
                                     throw new System.InvalidOperationException("Could not elevate with pbrun. Error occured. Please retry.");
                                 }
-                                Console.WriteLine(shellStream.Read());
+                                
                                 System.Threading.Thread.Sleep(7000);
                                 output = shellStream.Expect(new Regex(@"[$#>]"));
-                                Console.WriteLine(output);
-                                shellStream.WriteLine(myr_command);
-                                output = shellStream.Expect(new Regex(@"[$#>]"));
+                                shellStream.WriteLine(myr_command + " && cat /tmp/myrtmp");
+                                output = shellStream.Expect(new Regex(@"(myrfinish)")); //return output on the exit point
                                 result = output;
                                 Console.WriteLine(output);
-                                shellStream.WriteLine("echo myrfinish");
                             } else
                             {
                                 shellStream.WriteLine(myr_command);
-                                output = shellStream.Expect(new Regex(@"[$#>]"));
+                                output = shellStream.Expect(new Regex(@"(myrfinish)"));
+                                result = output;
                                 Console.WriteLine(output);
-                                shellStream.WriteLine("echo myrfinish");
                             }
                             
                         } else
@@ -495,6 +493,7 @@ namespace myr
 
             return ConnNfo;
         }
+
 
 
         /// <summary>
